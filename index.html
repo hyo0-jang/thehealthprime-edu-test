@@ -83,6 +83,11 @@ svg{flex:none}
 .modes{display:flex;background:var(--sec);border-radius:12px;padding:3px}
 .modes button{border:0;background:none;padding:6px 10px;border-radius:10px;font-size:13px;font-weight:600;color:var(--sub)}
 .modes button[aria-pressed="true"]{background:var(--bg);color:var(--ink);box-shadow:var(--shadow)}
+.pmenu{display:grid;justify-items:end;gap:0;margin-right:-6px}
+.pmenu button{border:0;background:none;padding:3px 6px;font-size:13px;font-weight:600;color:var(--sub);line-height:1.35;border-radius:8px}
+.pmenu button:first-child{color:var(--blue)}
+.pmenu button:active{background:var(--sec)}
+.top-in:has(.pmenu:not([hidden])){min-height:60px}
 .lhead .top-in{gap:4px}
 .lhead .cat{flex:1;min-width:0;font-size:15px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .lhead .pos{font-size:14px;font-weight:600;color:var(--sub);font-variant-numeric:tabular-nums}
@@ -368,6 +373,10 @@ a.cta{text-decoration:none}
   <header class="top gut" id="topbar"><div class="top-in">
     <a class="logo" href="#home">더헬스 <span>프라임</span></a>
     <div class="sp"></div>
+    <nav class="pmenu" id="pmenu" hidden aria-label="참여 메뉴">
+      <button type="button" id="pmCode">참여코드 다시 입력</button>
+      <button type="button" id="pmHome">첫 페이지로 돌아가기</button>
+    </nav>
     <div class="modes" id="modeSeg" hidden>
       <button type="button" id="mLearn" aria-pressed="true">참여자</button>
       <button type="button" id="mAdmin" aria-pressed="false">운영 관리</button>
@@ -614,7 +623,13 @@ function setMode(mode, silent){
   if (!silent){ if (mode==='admin') history.replaceState(null,'','#admin'); else if (location.hash==='#admin') history.replaceState(null,'','#home'); route(); window.scrollTo(0,0); }
 }
 $('#mLearn').onclick=()=>setMode('learn'); $('#mAdmin').onclick=()=>setMode('admin');
-function setChrome(lesson){ $('#topbar').hidden=lesson; }
+$('#pmCode').onclick=()=>changeCode(); $('#pmHome').onclick=()=>go('welcome');
+function setChrome(lesson){ $('#topbar').hidden=lesson; syncPMenu(); }
+function syncPMenu(){
+  const m=$('#pmenu'); if (!m) return;
+  const show = S.mode!=='admin' && hasCode() && (S.view==='home' || S.view==='landing');
+  m.hidden=!show; $('#pmHome').hidden = S.view==='landing';
+}
 function paint(...nodes){ const flat=nodes.flat(Infinity).filter(Boolean); const bars=flat.filter(n=>n.classList&&n.classList.contains('cta-bar')); const v=h('div',{class:'view'},flat.filter(n=>!bars.includes(n))); app.replaceChildren(v,...bars); return v; }
 function ctaBar(...kids){ return h('div',{class:'cta-bar'},kids); }
 function backBar(onBack, label){
@@ -637,8 +652,11 @@ function renderLanding(){
       h('li',null,h('span',{class:'num'},'02'),h('div',null,h('div',{class:'k'},'참여하면'),h('div',{class:'v'},'내 건강에 맞는 프로그램으로 건강습관이 만들어져요.'))),
       h('li',null,h('span',{class:'num'},'03'),h('div',null,h('div',{class:'k'},'참여 후'),h('div',{class:'v'},'건강 변화를 수치로 확인하고, 스스로 관리할 수 있어요.'))))),
     h('p',{class:'foottxt'},'문의: 더헬스 앱 1:1 문의 · 본 교육 콘텐츠는 보다 편리한 이용을 위한 참고 자료입니다. (테스트 버전 · 진행 기록은 이 기기에만 저장돼요)')),
-    ctaBar(h('button',{class:'cta',type:'button',onclick:()=>go('code')},'교육 시작하기',ico('next',20)),
-      h('button',{class:'tact',type:'button',onclick:()=>go('code')},'이미 참여 중이신가요? ',h('b',null,'참여코드 입력'))));
+    hasCode()
+      ? ctaBar(h('button',{class:'cta',type:'button',onclick:()=>go('home')},'교육 이어하기',ico('next',20)))
+      : ctaBar(h('button',{class:'cta',type:'button',onclick:()=>go('code')},'교육 시작하기',ico('next',20)),
+          h('button',{class:'tact',type:'button',onclick:()=>go('code')},'이미 참여 중이신가요? ',h('b',null,'참여코드 입력'))));
+  syncPMenu();
 }
 
 /* ---------- 2–3. participation code ---------- */
@@ -748,6 +766,7 @@ function renderHome(){
           st==='done'?h('span',{class:'st done'},ico('check',18,2.6),'완료'):st==='go'?h('span',{class:'st go'},'이어보기',ico('next',16)):h('span',{class:'st new'},'시작하기',ico('next',16)))));
     });
   });
+  setTimeout(syncPMenu,0);
   paint(h('div',{class:'page gut'},
     h('div',{class:'stack'},h('h1',{class:'t-main'},'안녕하세요 👋',h('br'),fin?'교육을 모두 마치셨어요':'오늘도 조금만 진행해볼까요?')),
     !S.uid?h('div',{class:'notice'},'로그인 정보가 없어 학습 기록이 저장되지 않아요. 콘텐츠는 볼 수 있어요.'):null,
@@ -755,7 +774,7 @@ function renderHome(){
     h('section',{class:'stack',style:'gap:14px'},h('h2',{class:'t-sec'},'교육 과정'),
       pm.length?list:h('div',{class:'empty-box'},'아직 공개된 교육이 없어요. 운영 담당자가 공개하면 이곳에 표시돼요.')),
     h('div',{class:'stack'},
-      h('div',{class:'mine'},'내 교육 구성',myDevices().map(d=>h('span',{class:'chip blue'},DEV[d]||d)),h('button',{type:'button',onclick:changeCode},'참여코드 다시 입력')),
+      h('div',{class:'mine'},'내 교육 구성',myDevices().map(d=>h('span',{class:'chip blue'},DEV[d]||d))),
       h('p',{class:'foottxt'},'문의: 더헬스 앱 1:1 문의',h('br'),'본 교육 콘텐츠는 보다 편리한 이용을 위한 참고 자료입니다. 이상 증상이 있으면 의료진과 상담하세요.'))));
 }
 
@@ -977,7 +996,7 @@ function certPopup(){
   sheet(close=>h('div',{class:'stack',style:'gap:16px;text-align:center;justify-items:center'},
     h('div',{class:'okcircle'},ico('check',36,2.6)),
     h('h2',{class:'t-sec'},'모든 교육을 이수했어요'),
-    h('p',{class:'lead'},'이수 인증을 하면 수료율과 인증 ID가 담긴 인증서가 만들어지고, 선물을 신청할 수 있어요.'),
+    h('p',{class:'lead'},'이수 인증을 하면 수료율과 인증 ID가 담긴 인증서가 만들어지고, 메일로 선물을 신청할 수 있어요.'),
     h('button',{class:'cta',type:'button',onclick:()=>{ close(); go('cert'); }},'교육 이수 인증하기'),
     h('button',{class:'tact',type:'button',onclick:close},'나중에 할게요')));
 }
@@ -1019,12 +1038,17 @@ function renderCert(){
   requestAnimationFrame(()=>requestAnimationFrame(()=>{ barI.style.width=rate+'%'; }));
   if (!nick) setTimeout(()=>nickSheet(renderCert),350);
 }
-const KAKAO_CHAT='https://pf.kakao.com/_yDcgn/chat';
+const CERT_TO='hyo0.jang@samsung.com';
 function certText(){
   const c=S.prog.cert, pm=myMods(); const rate=Math.round(pm.reduce((a,m)=>a+lessonRate(m),0)/(pm.length||1));
-  return ['[더헬스 프라임 사전교육 이수 인증]',
-    `인증 ID: ${c.id}`,`닉네임: ${c.nickname}`,`이수 완료일: ${fmtDate(S.prog.completedAt||Date.now())}`,`전체 수료율: ${rate}% (${pm.filter(m=>modState(m).complete).length}/${pm.length})`,'',
-    '■ 선물 수령 정보 (아래에 작성해 주세요)','수료자 이름: ','수료자 소속 회사명: ','수료자 연락처: '].join('\n');
+  return ['안녕하세요. 더헬스 프라임 사전교육 이수를 인증합니다.','',
+    '■ 이수 인증 정보',`- 인증 ID: ${c.id}`,`- 닉네임: ${c.nickname}`,`- 이수 완료일: ${fmtDate(S.prog.completedAt||Date.now())}`,`- 전체 수료율: ${rate}% (${pm.filter(m=>modState(m).complete).length}/${pm.length})`,'',
+    '※ 캡처한 이수 인증 화면 이미지를 이 메일에 첨부해 주세요.','',
+    '■ 선물 수령 정보 (아래에 작성해 주세요)','- 수료자 이름: ','- 수료자 소속 회사명: ','- 수료자 연락처: ','','감사합니다.'].join('\n');
+}
+function mailHref(){
+  const subject=`[더헬스 프라임] 사전교육 이수 인증 · ${S.prog.cert.id}`;
+  return `mailto:${CERT_TO}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(certText())}`;
 }
 function captureView(onClose){
   const pm=myMods(); const rate=Math.round(pm.reduce((a,m)=>a+lessonRate(m),0)/(pm.length||1)); const c=S.prog.cert;
@@ -1040,23 +1064,24 @@ function captureView(onClose){
 function giftSheet(){
   const c=ensureCert(); c.requestedAt=c.requestedAt||Date.now(); saveProg();
   sheet(close=>{
-    const done={cap:false,copy:false};
     const mk=(n,label,sub)=>h('div',{class:'gstep'},h('span',{class:'gnum'},String(n)),h('div',null,h('strong',null,label),h('small',null,sub)));
-    const s1=h('button',{class:'cta soft',type:'button',onclick:()=>{ close(); captureView(()=>{ done.cap=true; giftSheet(); }); }},'인증 화면 캡처하기');
-    const ta=h('textarea',{class:'free',readonly:true,rows:'6','aria-label':'복사할 인증 내용',hidden:true,style:'min-height:150px;font-size:14px'}); ta.value=certText();
-    const s2=h('button',{class:'cta soft',type:'button',onclick:async()=>{
-      try{ await navigator.clipboard.writeText(certText()); s2.textContent='✓ 복사됨 · 다시 복사'; toast('인증 내용을 복사했어요.'); }
-      catch{ ta.hidden=false; ta.focus(); ta.select(); s2.textContent='아래 내용을 길게 눌러 복사해 주세요'; } }},'인증 내용 복사하기');
-    const s3=h('a',{class:'cta kakao',href:KAKAO_CHAT,target:'_blank',rel:'noopener',onclick:()=>{ c.kakaoAt=Date.now(); saveProg(); }},'카카오톡 채널로 보내기');
+    const s1=h('button',{class:'cta soft',type:'button',onclick:()=>{ close(); captureView(()=>giftSheet()); }},'1. 인증 화면 캡처하기');
+    const s2=h('a',{class:'cta',href:mailHref(),onclick:()=>{ c.mailedAt=Date.now(); saveProg(); }},'2. 메일 보내기');
+    const ta=h('textarea',{class:'free',readonly:true,'aria-label':'메일 본문',hidden:true,style:'min-height:180px;font-size:14px'}); ta.value=certText();
+    const copyBody=h('button',{class:'tact',type:'button',onclick:async()=>{
+      try{ await navigator.clipboard.writeText(certText()); toast('메일 본문을 복사했어요.'); }
+      catch{ ta.hidden=false; ta.focus(); ta.select(); } }},'메일 본문 복사');
+    const copyTo=h('button',{class:'tact',type:'button',onclick:async()=>{
+      try{ await navigator.clipboard.writeText(CERT_TO); toast('메일 주소를 복사했어요.'); }catch{ toast(CERT_TO); } }},'받는 사람 ',h('b',null,CERT_TO),' 복사');
     return h('div',{class:'stack',style:'gap:14px'},
-      h('h2',{class:'t-sec'},'카카오톡으로 선물 신청하기'),
-      h('p',{class:'lead'},'아래 순서대로 준비한 뒤 채널 채팅방에 보내주세요.'),
+      h('h2',{class:'t-sec'},'메일로 선물 신청하기'),
+      h('p',{class:'lead'},'인증 화면을 캡처한 뒤 메일로 보내주세요.'),
       h('div',{class:'gsteps'},
-        mk(1,'인증 화면 캡처','캡처한 이미지를 채팅방에 보내주세요.'),
-        mk(2,'인증 내용 복사','채팅창에 붙여넣고 이름·소속 회사명·연락처를 적어주세요.'),
-        mk(3,'카카오톡 채널 채팅','더헬스 프라임 채널 1:1 채팅방이 열려요.')),
-      s1, s2, ta, s3,
-      h('p',{class:'cap'},'채팅방이 열리지 않으면 카카오톡에 로그인되어 있는지 확인해주세요.'));
+        mk(1,'인증 화면 캡처','휴대폰 화면 캡처로 이수 인증 화면을 저장해 주세요.'),
+        mk(2,'메일 보내기',`받는 사람(${CERT_TO})과 작성 양식이 채워진 메일이 열려요. 캡처한 이미지를 첨부하고 이름·소속 회사명·연락처를 적어 보내주세요.`)),
+      s1, s2,
+      h('div',{class:'row',style:'justify-content:center;gap:4px'},copyTo,copyBody), ta,
+      h('p',{class:'cap'},'메일 앱이 열리지 않으면 위 주소로 캡처 이미지와 함께 직접 보내주세요. 카카오톡 안에서 열었다면 오른쪽 위 메뉴의 "다른 브라우저로 열기"를 이용해 주세요.'));
   });
 }
 
